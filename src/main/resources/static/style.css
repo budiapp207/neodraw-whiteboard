@@ -1,0 +1,69 @@
+:root {
+    --bg: #f9fafb;
+    --panel: #ffffff;
+    --text: #111827;
+    --border: #e5e7eb;
+    --accent: #3b82f6;
+}
+
+body.dark {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --text: #e5e7eb;
+    --border: #334155;
+    --accent: #38bdf8;
+}
+
+body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+
+/* HEADER */
+header {
+    padding: 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+}
+
+/* TOOLBAR */
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+}
+
+.toolbar button,
+.toolbar select,
+.toolbar input {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.toolbar button:hover {
+    background: var(--accent);
+    color: white;
+}
+
+/* CANVAS */
+.canvas-wrapper {
+    height: calc(100vh - 150px);
+    padding: 10px;
+}
+
+canvas {
+    width: 100%;
+    height: 100%;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+}

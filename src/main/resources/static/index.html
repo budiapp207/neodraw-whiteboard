@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>NeoDraw Whiteboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+<style>
+:root{
+  --bg:#f3f4f6;
+  --panel:#ffffff;
+  --text:#111827;
+  --border:#e5e7eb;
+  --accent:#2563eb;
+}
+body.dark{
+  --bg:#0f172a;
+  --panel:#1e293b;
+  --text:#e5e7eb;
+  --border:#334155;
+  --accent:#38bdf8;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Segoe UI,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  overscroll-behavior: none;
+}
+header{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 16px;
+  background:var(--panel);
+  border-bottom:1px solid var(--border);
+}
+header img{height:36px}
+header h1{margin:0;font-size:18px;flex:1}
+
+.toolbar{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  padding:10px;
+  background:var(--panel);
+  border-bottom:1px solid var(--border);
+}
+.toolbar select,
+.toolbar input,
+.toolbar button{
+  padding:6px 10px;
+  border-radius:6px;
+  border:1px solid var(--border);
+  background:var(--bg);
+  color:var(--text);
+  font-size:14px;
+}
+.toolbar button:hover{
+  background:var(--accent);
+  color:#fff;
+}
+
+.canvas-wrapper{
+  height:calc(100vh - 150px);
+  padding:10px;
+}
+canvas{
+  width:100%;
+  height:100%;
+  background:white;
+  border-radius:12px;
+  box-shadow:0 10px 25px rgba(0,0,0,.2);
+  touch-action:none;
+  cursor:crosshair;
+}
+
+/* WATERMARK */
+.watermark{
+  position:fixed;
+  bottom:10px;
+  right:10px;
+  font-size:12px;
+  opacity:.4;
+}
+
+/* MOBILE */
+@media(max-width:768px){
+  header h1{font-size:15px}
+  .canvas-wrapper{height:calc(100vh - 170px)}
+}
+</style>
+</head>
+
+<body class="dark">
+
+<header>
+  <img src="/images/logoneo.png">
+  <h1>NeoDraw Whiteboard</h1>
+  <img src="/images/logounpam2.png">
+</header>
+
+<div class="toolbar">
+  <select id="brush">
+    <option value="pen">Pen</option>
+    <option value="glow">Glow</option>
+    <option value="marker">Marker</option>
+    <option value="pencil">Pencil</option>
+    <option value="eraser">Eraser</option>
+  </select>
+
+  <input type="range" id="size" min="1" max="30" value="5">
+  <input type="color" id="color" value="#3b82f6">
+
+  <button onclick="undo()">Undo</button>
+  <button onclick="redo()">Redo</button>
+  <button onclick="clearCanvas()">Clear</button>
+  <button id="themeBtn">☀️ Light</button>
+  <button onclick="saveCanvas()">Save</button>
+</div>
+
+<div class="canvas-wrapper">
+  <canvas id="canvas"></canvas>
+</div>
+
+<div class="watermark">
+  Kelompok 12 · Pemrograman II · Universitas Pamulang
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = canvas.offsetWidth * ratio;
+  canvas.height = canvas.offsetHeight * ratio;
+  ctx.scale(ratio, ratio);
+}
+window.addEventListener("resize",resize);
+resize();
+
+let drawing=false;
+let history=[], redoStack=[];
+
+function saveState(){
+  history.push(canvas.toDataURL());
+  if(history.length>30) history.shift();
+  redoStack=[];
+}
+
+function pos(e){
+  const r=canvas.getBoundingClientRect();
+  return {
+    x:(e.clientX - r.left),
+    y:(e.clientY - r.top)
+  };
+}
+
+function start(e){
+  e.preventDefault();
+  drawing=true;
+  saveState();
+  const p=pos(e);
+  ctx.beginPath();
+  ctx.moveTo(p.x,p.y);
+}
+
+function draw(e){
+  if(!drawing) return;
+  e.preventDefault();
+
+  const p=pos(e);
+  const brush=document.getElementById("brush").value;
+  ctx.lineWidth=size.value;
+  ctx.lineCap="round";
+
+  ctx.globalCompositeOperation =
+    brush==="eraser"?"destination-out":"source-over";
+
+  if(brush==="glow"){
+    ctx.strokeStyle=color.value;
+    ctx.shadowColor=color.value;
+    ctx.shadowBlur=15;
+  }else if(brush==="marker"){
+    ctx.strokeStyle=color.value;
+    ctx.globalAlpha=0.4;
+    ctx.shadowBlur=0;
+  }else if(brush==="pencil"){
+    ctx.strokeStyle="#555";
+    ctx.globalAlpha=1;
+    ctx.shadowBlur=0;
+  }else{
+    ctx.strokeStyle=color.value;
+    ctx.shadowBlur=0;
+  }
+
+  ctx.lineTo(p.x,p.y);
+  ctx.stroke();
+  ctx.globalAlpha=1;
+}
+
+function stop(){
+  drawing=false;
+  ctx.closePath();
+}
+
+canvas.addEventListener("pointerdown",start);
+canvas.addEventListener("pointermove",draw);
+canvas.addEventListener("pointerup",stop);
+canvas.addEventListener("pointerleave",stop);
+
+function saveCanvas(){
+  const dataURL = canvas.toDataURL("image/png");
+
+  fetch("http://localhost:8080/api/drawings/save", {
+    method:"POST",
+    headers:{ "Content-Type":"text/plain" },
+    body:dataURL
+  })
+  .then(r=>r.text())
+  .then(()=>alert("Saved ke database ✅"))
+  .catch(()=>alert("Gagal save ❌"));
+}
+
+function undo(){
+  if(!history.length) return;
+  redoStack.push(canvas.toDataURL());
+  let img=new Image();
+  img.src=history.pop();
+  img.onload=()=>ctx.drawImage(img,0,0);
+}
+
+function redo(){
+  if(!redoStack.length) return;
+  history.push(canvas.toDataURL());
+  let img=new Image();
+  img.src=redoStack.pop();
+  img.onload=()=>ctx.drawImage(img,0,0);
+}
+
+function clearCanvas(){
+  saveState();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+const themeBtn=document.getElementById("themeBtn");
+let dark=true;
+themeBtn.onclick=()=>{
+  dark=!dark;
+  document.body.classList.toggle("dark");
+  themeBtn.textContent=dark?"☀️ Light":"🌙 Dark";
+};
+</script>
+
+</body>
+</html>
